@@ -3,7 +3,7 @@
 //
 // Connects the Spot-Insight GUI to the Smart Parking REST API.
 // All endpoints, object shapes and command names mirror the server contract
-// (package `smartparking`, base path `/smart-parking`).
+// (package `ambient_invisible_intelligence`, base path `/ambient-invisible-intelligence`).
 // ─────────────────────────────────────────────────────────────────────────────
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8084/ambient-invisible-intelligence";
