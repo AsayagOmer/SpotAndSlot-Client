@@ -1,88 +1,12 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { format, addDays } from "date-fns";
-import { he } from "date-fns/locale";
 import { Calendar, Clock, Sparkles, CloudSun, Server, Loader2 } from "lucide-react";
-import { AreaChart, Area, XAxis, ResponsiveContainer, ReferenceDot, YAxis } from "recharts";
+import { AreaChart, Area, XAxis, ResponsiveContainer, ReferenceDot } from "recharts";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import SmartInsights from "@/components/SmartInsights";
-import { useParkingData, useLotPrediction } from "@/hooks/useParkingData";
-
-// Realistic college parking patterns
-const getCollegeOccupancyPattern = (date: Date) => {
-  const dayOfWeek = date.getDay();
-  const isWeekend = dayOfWeek === 5 || dayOfWeek === 6; // Friday or Saturday in Israel
-  const isSunday = dayOfWeek === 0; // First day of week, typically busy
-  const dateVariation = (date.getDate() % 7) - 3; // Small variation based on date
-
-  if (isWeekend) {
-    // Weekend - very low occupancy
-    return {
-      pattern: [5, 8, 15, 20, 18, 12, 10, 8, 6, 5, 5, 5, 5],
-      hours: [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
-      variation: dateVariation * 0.5
-    };
-  } else if (isSunday) {
-    // Sunday - busiest day
-    return {
-      pattern: [5, 15, 45, 75, 88, 95, 92, 90, 85, 70, 50, 30, 15],
-      hours: [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
-      variation: dateVariation
-    };
-  } else {
-    // Regular weekdays (Mon-Thu)
-    return {
-      pattern: [5, 12, 35, 65, 82, 88, 85, 80, 75, 60, 40, 25, 12],
-      hours: [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
-      variation: dateVariation
-    };
-  }
-};
-
-// Generate chart data points
-const generatePredictionData = (date: Date) => {
-  const { pattern, hours, variation } = getCollegeOccupancyPattern(date);
-
-  const timeLabels = [
-    "06:00", "07:00", "08:00", "09:00", "10:00", "11:00",
-    "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"
-  ];
-
-  return timeLabels.map((time, index) => ({
-    time,
-    hour: hours[index],
-    value: Math.max(5, Math.min(98, pattern[index] + variation))
-  }));
-};
-
-// Get predicted occupancy for a specific hour (interpolated)
-const getPredictedOccupancy = (date: Date, hour: number) => {
-  const { pattern, hours, variation } = getCollegeOccupancyPattern(date);
-
-  // Handle out of bounds
-  if (hour <= hours[0]) return Math.max(5, Math.min(98, pattern[0] + variation));
-  if (hour >= hours[hours.length - 1]) return Math.max(5, Math.min(98, pattern[pattern.length - 1] + variation));
-
-  // Find surrounding hours
-  let index = 0;
-  for (let i = 0; i < hours.length - 1; i++) {
-    if (hour >= hours[i] && hour < hours[i + 1]) {
-      index = i;
-      break;
-    }
-  }
-
-  const startHour = hours[index];
-  const endHour = hours[index + 1];
-  const startValue = pattern[index];
-  const endValue = pattern[index + 1];
-
-  const progress = (hour - startHour) / (endHour - startHour);
-  const interpolatedBase = startValue + (endValue - startValue) * progress;
-
-  return Math.max(5, Math.min(98, interpolatedBase + variation));
-};
+import { useParkingData, useLotPrediction, useLotPredictionSeries } from "@/hooks/useParkingData";
 
 const timeOptions = [
   "06:00", "06:30", "07:00", "07:30", "08:00", "08:30",
@@ -90,6 +14,11 @@ const timeOptions = [
   "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
   "15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
   "18:00", "18:30", "19:00"
+];
+
+const chartTimeOptions = [
+  "06:00", "07:00", "08:00", "09:00", "10:00", "11:00",
+  "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"
 ];
 
 const parseTimeToParts = (timeStr: string): { hours: number; minutes: number } => {
@@ -116,6 +45,14 @@ const getTimeOptionDate = (date: Date, timeStr: string): Date => {
   const optionDate = new Date(date);
   optionDate.setHours(hours, minutes, 0, 0);
   return optionDate;
+};
+
+const clampFreeSlots = (freeSlots: number, totalSpots: number): number =>
+  Math.max(0, Math.min(totalSpots, freeSlots));
+
+const freeSlotsToOccupancy = (freeSlots: number, totalSpots: number): number => {
+  if (totalSpots <= 0) return 0;
+  return Math.round(((totalSpots - clampFreeSlots(freeSlots, totalSpots)) / totalSpots) * 100);
 };
 
 const PredictionsView = () => {
@@ -168,21 +105,50 @@ const PredictionsView = () => {
   // ── Live API-backed prediction ──
   const { data: parking } = useParkingData(10000);
   const lotId = parking?.lotId ?? null;
+  const totalSpots = parking?.totalSpots ?? 0;
+  const currentFreeSlots = parking?.freeCount ?? 0;
   const targetIso = useMemo(
     () => getTimeOptionDate(selectedDate, selectedTime).toISOString(),
     [selectedDate, selectedTime],
   );
   const { data: serverPrediction, isFetching: predLoading } = useLotPrediction(lotId, targetIso);
+  const chartTargetTimestamps = useMemo(
+    () => chartTimeOptions.map((time) => getTimeOptionDate(selectedDate, time).toISOString()),
+    [selectedDate],
+  );
+  const predictionSeries = useLotPredictionSeries(lotId, chartTargetTimestamps);
+  const seriesLoading = predictionSeries.some((query) => query.isFetching);
+
+  const predictedFreeSlots = serverPrediction?.predictedFreeSlots ?? currentFreeSlots;
+  const currentOccupancy = freeSlotsToOccupancy(predictedFreeSlots, totalSpots);
 
   const occupancyData = useMemo(() =>
-    generatePredictionData(selectedDate),
-    [selectedDate]
+    chartTimeOptions.map((time, index) => {
+      const prediction = predictionSeries[index]?.data;
+      const predictedFree = prediction?.predictedFreeSlots ?? currentFreeSlots;
+      return {
+        time,
+        hour: parseTimeToHour(time),
+        value: freeSlotsToOccupancy(predictedFree, totalSpots),
+      };
+    }),
+    [currentFreeSlots, predictionSeries, totalSpots]
   );
-
-  // Calculate interpolated occupancy for the animated hour
-  const currentOccupancy = useMemo(() =>
-    Math.round(getPredictedOccupancy(selectedDate, animatedHour)),
-    [selectedDate, animatedHour]
+  const trendDelta = useMemo(() => {
+    const morningOccupancy = occupancyData[0]?.value ?? currentOccupancy;
+    const noonOccupancy = occupancyData.find((point) => point.hour === 12)?.value ?? currentOccupancy;
+    return Math.round(noonOccupancy - morningOccupancy);
+  }, [currentOccupancy, occupancyData]);
+  const bestPredictionPoint = useMemo(
+    () => occupancyData.reduce(
+      (best, point) => point.value < best.value ? point : best,
+      occupancyData[0] ?? { time: selectedTime, hour: targetHour, value: currentOccupancy },
+    ),
+    [currentOccupancy, occupancyData, selectedTime, targetHour],
+  );
+  const nextImprovementPoint = useMemo(
+    () => occupancyData.find((point) => point.hour > targetHour && point.value < currentOccupancy) ?? null,
+    [currentOccupancy, occupancyData, targetHour],
   );
 
   // Also enable updating the displayed "Date" text based on selectedDate immediately
@@ -232,7 +198,7 @@ const PredictionsView = () => {
       {lotId && (
         <div className="card-elevated p-4 flex items-center justify-between border-2 border-primary/20 animate-fade-in">
           <div className="flex items-center gap-2 text-primary">
-            {predLoading ? (
+            {predLoading || seriesLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <Server className="w-4 h-4" />
@@ -401,8 +367,8 @@ const PredictionsView = () => {
             <Sparkles className="w-6 h-6 text-primary-foreground" />
           </div>
           <div className="flex-1 text-right">
-            <h4 className="font-semibold text-base">לפני 08:45</h4>
-            <p className="text-sm text-muted-foreground">{Math.max(0, 100 - currentOccupancy)}% סיכוי למצוא חנייה מהר</p>
+            <h4 className="font-semibold text-base">{bestPredictionPoint.time}</h4>
+            <p className="text-sm text-muted-foreground">{Math.max(0, 100 - bestPredictionPoint.value)}% סיכוי למצוא חנייה מהר</p>
           </div>
         </div>
 
@@ -411,13 +377,19 @@ const PredictionsView = () => {
             <CloudSun className="w-6 h-6 text-muted-foreground" />
           </div>
           <div className="flex-1 text-right">
-            <h4 className="font-semibold text-base">אחרי 15:30</h4>
-            <p className="text-sm text-muted-foreground">מקומות מתפנים לקראת שיעורי ערב</p>
+            <h4 className="font-semibold text-base">
+              {nextImprovementPoint ? nextImprovementPoint.time : "אין שיפור צפוי"}
+            </h4>
+            <p className="text-sm text-muted-foreground">
+              {nextImprovementPoint
+                ? `${Math.max(0, 100 - nextImprovementPoint.value)}% סיכוי למצוא חנייה מהר`
+                : "התחזית מהשרת אינה מציגה חלון טוב יותר בהמשך היום"}
+            </p>
           </div>
         </div>
       </div>
 
-      <SmartInsights />
+      <SmartInsights trendDelta={trendDelta} />
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import {
   getAllObjects,
   predictAvailability,
@@ -128,5 +128,17 @@ export function useLotPrediction(lotId: string | null, targetTimestamp: string |
     enabled: Boolean(lotId && targetTimestamp),
     staleTime: 60_000,
     retry: false,
+  });
+}
+
+export function useLotPredictionSeries(lotId: string | null, targetTimestamps: string[]) {
+  return useQueries({
+    queries: targetTimestamps.map((targetTimestamp) => ({
+      queryKey: ["prediction", lotId, targetTimestamp],
+      queryFn: () => predictAvailability(lotId!, targetTimestamp),
+      enabled: Boolean(lotId && targetTimestamp),
+      staleTime: 60_000,
+      retry: false,
+    })),
   });
 }
