@@ -8,6 +8,14 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    // Proxy ML-service calls so the browser reaches it same-origin (no CORS).
+    proxy: {
+      "/ml": {
+        target: "http://localhost:5000",
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/ml/, ""),
+      },
+    },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {

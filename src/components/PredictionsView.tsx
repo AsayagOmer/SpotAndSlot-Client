@@ -1,59 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { format, addDays } from "date-fns";
-import { Calendar, Clock, Sparkles, CloudSun, Server, Loader2 } from "lucide-react";
-import { AreaChart, Area, XAxis, ResponsiveContainer, ReferenceDot } from "recharts";
+import { Calendar, Clock, Sparkles, CloudSun, Server, Loader2, PartyPopper } from "lucide-react";
+import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, ReferenceDot, Tooltip } from "recharts";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import SmartInsights from "@/components/SmartInsights";
-import { useParkingData, useLotPrediction, useLotPredictionSeries } from "@/hooks/useParkingData";
+import { useParkingData, useDayForecast } from "@/hooks/useParkingData";
 
 const timeOptions = [
-  "06:00", "06:30", "07:00", "07:30", "08:00", "08:30",
-  "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
-  "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
-  "15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
-  "18:00", "18:30", "19:00"
+  "06:00", "07:00", "08:00", "09:00", "10:00", "11:00", "12:00", "13:00",
+  "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00", "22:00",
 ];
 
-const chartTimeOptions = [
-  "06:00", "07:00", "08:00", "09:00", "10:00", "11:00",
-  "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"
-];
+const HOUR_MIN = 6;
+const HOUR_MAX = 22;
 
-const parseTimeToParts = (timeStr: string): { hours: number; minutes: number } => {
-  const match = timeStr.match(/(\d{1,2}):(\d{2})/);
-  if (!match) return { hours: 9, minutes: 0 };
-  const hours = parseInt(match[1], 10);
-  const minutes = parseInt(match[2], 10);
-  return { hours, minutes };
-};
-
-const parseTimeToHour = (timeStr: string): number => {
-  const { hours, minutes } = parseTimeToParts(timeStr);
-  return hours + (minutes / 60);
-};
-
-const formatHourToTime = (hour: number): string => {
-  const h = Math.floor(hour);
-  const m = Math.round((hour - h) * 60);
-  return `${h < 10 ? '0' : ''}${h}:${m < 10 ? '0' : ''}${m}`;
-};
-
-const getTimeOptionDate = (date: Date, timeStr: string): Date => {
-  const { hours, minutes } = parseTimeToParts(timeStr);
-  const optionDate = new Date(date);
-  optionDate.setHours(hours, minutes, 0, 0);
-  return optionDate;
-};
-
-const clampFreeSlots = (freeSlots: number, totalSpots: number): number =>
-  Math.max(0, Math.min(totalSpots, freeSlots));
-
-const freeSlotsToOccupancy = (freeSlots: number, totalSpots: number): number => {
-  if (totalSpots <= 0) return 0;
-  return Math.round(((totalSpots - clampFreeSlots(freeSlots, totalSpots)) / totalSpots) * 100);
-};
+const parseHour = (t: string) => parseInt(t.slice(0, 2), 10);
+const fmtHour = (h: number) => `${h < 10 ? "0" : ""}${Math.round(h)}:00`;
 
 const PredictionsView = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -61,168 +25,104 @@ const PredictionsView = () => {
   const [dateOpen, setDateOpen] = useState(false);
   const [timeOpen, setTimeOpen] = useState(false);
 
-  // Target hour derived from selection
-  const targetHour = parseTimeToHour(selectedTime);
+  const targetHour = parseHour(selectedTime);
 
-  // Animated hour state
+  // smooth animated marker
   const [animatedHour, setAnimatedHour] = useState(targetHour);
-
-  // Animation loop
   useEffect(() => {
-    // If we are very close to target, just snap
-    if (Math.abs(animatedHour - targetHour) < 0.005) {
-      if (animatedHour !== targetHour) {
-        setAnimatedHour(targetHour);
-      }
+    if (Math.abs(animatedHour - targetHour) < 0.01) {
+      if (animatedHour !== targetHour) setAnimatedHour(targetHour);
       return;
     }
-
-    let animationFrameId: number;
-
-    const animate = () => {
-      setAnimatedHour(prev => {
-        const diff = targetHour - prev;
-
-        // Snap if close enough to avoid endless micro-updates
-        if (Math.abs(diff) < 0.005) {
-          return targetHour;
-        }
-
-        // Smooth easing (adjust 0.15 for speed)
-        return prev + diff * 0.15;
-      });
-
-      animationFrameId = requestAnimationFrame(animate);
+    let raf: number;
+    const step = () => {
+      setAnimatedHour((p) => (Math.abs(targetHour - p) < 0.01 ? targetHour : p + (targetHour - p) * 0.18));
+      raf = requestAnimationFrame(step);
     };
-
-    animationFrameId = requestAnimationFrame(animate);
-
-    return () => {
-      if (animationFrameId) cancelAnimationFrame(animationFrameId);
-    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
   }, [targetHour, animatedHour]);
 
-  // ── Live API-backed prediction ──
+  // lot context (capacity) from the live API
   const { data: parking } = useParkingData(10000);
-  const lotId = parking?.lotId ?? null;
   const totalSpots = parking?.totalSpots ?? 0;
-  const currentFreeSlots = parking?.freeCount ?? 0;
-  const targetIso = useMemo(
-    () => getTimeOptionDate(selectedDate, selectedTime).toISOString(),
-    [selectedDate, selectedTime],
-  );
-  const { data: serverPrediction, isFetching: predLoading } = useLotPrediction(lotId, targetIso);
-  const chartTargetTimestamps = useMemo(
-    () => chartTimeOptions.map((time) => getTimeOptionDate(selectedDate, time).toISOString()),
-    [selectedDate],
-  );
-  const predictionSeries = useLotPredictionSeries(lotId, chartTargetTimestamps);
-  const seriesLoading = predictionSeries.some((query) => query.isFetching);
+  const lotAlias = parking?.lotAlias ?? "החניון";
 
-  const predictedFreeSlots = serverPrediction?.predictedFreeSlots ?? currentFreeSlots;
-  const currentOccupancy = freeSlotsToOccupancy(predictedFreeSlots, totalSpots);
+  // real model forecast for the chosen day (one call, with P10–P90 band)
+  const dateYmd = format(selectedDate, "yyyy-MM-dd");
+  const { data: forecast, isFetching } = useDayForecast(totalSpots > 0 ? dateYmd : null, totalSpots);
 
-  const occupancyData = useMemo(() =>
-    chartTimeOptions.map((time, index) => {
-      const prediction = predictionSeries[index]?.data;
-      const predictedFree = prediction?.predictedFreeSlots ?? currentFreeSlots;
-      return {
-        time,
-        hour: parseTimeToHour(time),
-        value: freeSlotsToOccupancy(predictedFree, totalSpots),
-      };
-    }),
-    [currentFreeSlots, predictionSeries, totalSpots]
+  // build chart series: occupancy median + band (in occupancy %), within operating hours
+  const chartData = useMemo(() => {
+    if (!forecast || totalSpots <= 0) return [];
+    return forecast.points
+      .filter((p) => p.hour >= HOUR_MIN && p.hour <= HOUR_MAX)
+      .map((p) => {
+        const occLow = Math.round(((totalSpots - p.freeUpper) / totalSpots) * 100); // optimistic
+        const occHigh = Math.round(((totalSpots - p.freeLower) / totalSpots) * 100); // pessimistic
+        return {
+          hour: p.hour,
+          occ: p.occupancyPct,
+          band: [Math.max(0, Math.min(occLow, occHigh)), Math.min(100, Math.max(occLow, occHigh))] as [number, number],
+          free: p.freeMedian,
+        };
+      });
+  }, [forecast, totalSpots]);
+
+  const pointAt = (h: number) => chartData.reduce(
+    (best, p) => (Math.abs(p.hour - h) < Math.abs(best.hour - h) ? p : best),
+    chartData[0] ?? { hour: targetHour, occ: 0, band: [0, 0] as [number, number], free: 0 },
   );
+  const selected = chartData.length ? pointAt(targetHour) : null;
+  const currentOccupancy = selected?.occ ?? 0;
+  const predictedFree = selected?.free ?? 0;
+
+  // best (least busy) hour to arrive
+  const bestPoint = useMemo(
+    () => (chartData.length ? chartData.reduce((b, p) => (p.occ < b.occ ? p : b)) : null),
+    [chartData],
+  );
+
   const trendDelta = useMemo(() => {
-    const morningOccupancy = occupancyData[0]?.value ?? currentOccupancy;
-    const noonOccupancy = occupancyData.find((point) => point.hour === 12)?.value ?? currentOccupancy;
-    return Math.round(noonOccupancy - morningOccupancy);
-  }, [currentOccupancy, occupancyData]);
-  const bestPredictionPoint = useMemo(
-    () => occupancyData.reduce(
-      (best, point) => point.value < best.value ? point : best,
-      occupancyData[0] ?? { time: selectedTime, hour: targetHour, value: currentOccupancy },
-    ),
-    [currentOccupancy, occupancyData, selectedTime, targetHour],
-  );
-  const nextImprovementPoint = useMemo(
-    () => occupancyData.find((point) => point.hour > targetHour && point.value < currentOccupancy) ?? null,
-    [currentOccupancy, occupancyData, targetHour],
-  );
+    if (!chartData.length) return 0;
+    const morning = pointAt(8).occ;
+    const noon = pointAt(13).occ;
+    return Math.round(noon - morning);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chartData]);
 
-  // Also enable updating the displayed "Date" text based on selectedDate immediately
   const isToday = format(selectedDate, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
   const dateDisplayText = isToday ? "היום" : format(selectedDate, "dd/MM/yyyy");
 
-  // Helper to get current time for enabling/disabling options
-  const getNow = () => new Date();
-
-  const isTimeOptionDisabled = (time: string) =>
-    isToday && getTimeOptionDate(selectedDate, time) < getNow();
-
-  // Auto-advance if past time
-  useEffect(() => {
-    if (!isToday) return;
-    const currentTime = getNow();
-    const selectedDateTime = getTimeOptionDate(selectedDate, selectedTime);
-    if (selectedDateTime >= currentTime) return;
-
-    const nextTime = timeOptions.find(
-      (time) => getTimeOptionDate(selectedDate, time) >= currentTime
-    );
-
-    if (nextTime) {
-      setSelectedTime(nextTime);
-      return;
-    }
-
-    setSelectedDate(addDays(selectedDate, 1));
-    setSelectedTime(timeOptions[0]);
-  }, [isToday, selectedDate, selectedTime]);
-
-  // Determine blur amount based on velocity (distance to target)
   const velocity = Math.abs(targetHour - animatedHour);
-  const isMoving = velocity > 0.01;
-  const blurAmount = Math.min(4, velocity * 20); // Cap blur
+  const blurAmount = Math.min(4, velocity * 20);
 
   return (
     <div className="space-y-5 animate-fade-in">
-      {/* Title Section */}
+      {/* Title */}
       <div className="text-right">
         <h2 className="text-2xl font-bold">תחזיות תפוסה</h2>
-        <p className="text-muted-foreground mt-1">תכנן את ההגעה שלך לחניון</p>
+        <p className="text-muted-foreground mt-1">תכנן את ההגעה שלך ל{lotAlias}</p>
       </div>
 
-      {/* Live prediction from the Smart Parking API */}
-      {lotId && (
-        <div className="card-elevated p-4 flex items-center justify-between border-2 border-primary/20 animate-fade-in">
-          <div className="flex items-center gap-2 text-primary">
-            {predLoading || seriesLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Server className="w-4 h-4" />
-            )}
-            <span className="text-sm font-medium">תחזית מהשרת</span>
-          </div>
-          <div className="text-right">
-            {serverPrediction ? (
-              <>
-                <span className="text-2xl font-bold tabular-nums">
-                  {serverPrediction.predictedFreeSlots}
-                </span>
-                <span className="text-sm text-muted-foreground"> מקומות פנויים צפויים</span>
-              </>
-            ) : (
-              <span className="text-sm text-muted-foreground">אין נתון מהשרת</span>
-            )}
-          </div>
+      {/* model status / holiday banner */}
+      <div className="card-elevated p-3 flex items-center justify-between border-2 border-primary/20">
+        <div className="flex items-center gap-2 text-primary">
+          {isFetching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Server className="w-4 h-4" />}
+          <span className="text-sm font-medium">מודל XGBoost · חיזוי יומי</span>
         </div>
-      )}
+        {forecast?.isHoliday ? (
+          <div className="flex items-center gap-1.5 text-amber-600 text-sm font-medium">
+            <PartyPopper className="w-4 h-4" />
+            <span>{forecast.holidayName} — חג</span>
+          </div>
+        ) : (
+          <span className="text-xs text-muted-foreground">טווח ביטחון 80%</span>
+        )}
+      </div>
 
-      {/* Date/Time Selectors */}
+      {/* Date/Time selectors */}
       <div className="flex gap-3">
-        {/* Time Picker */}
         <Popover open={timeOpen} onOpenChange={setTimeOpen}>
           <PopoverTrigger asChild>
             <button className="flex-1 flex items-center justify-center gap-2 bg-card rounded-2xl py-3 px-4 border border-border hover:border-primary/30 transition-colors">
@@ -235,20 +135,10 @@ const PredictionsView = () => {
               {timeOptions.map((time) => (
                 <button
                   key={time}
-                  disabled={isTimeOptionDisabled(time)}
-                  onClick={() => {
-                    if (isTimeOptionDisabled(time)) return;
-                    setSelectedTime(time);
-                    setTimeOpen(false);
-                  }}
+                  onClick={() => { setSelectedTime(time); setTimeOpen(false); }}
                   className={cn(
-                    "text-base py-2 px-3 rounded-lg text-right transition-colors",
-                    isTimeOptionDisabled(time)
-                      ? "cursor-not-allowed opacity-50"
-                      : "hover:bg-muted",
-                    selectedTime === time
-                      ? "bg-primary text-primary-foreground"
-                      : ""
+                    "text-base py-2 px-3 rounded-lg text-right transition-colors hover:bg-muted",
+                    selectedTime === time ? "bg-primary text-primary-foreground" : "",
                   )}
                 >
                   {time}
@@ -258,7 +148,6 @@ const PredictionsView = () => {
           </PopoverContent>
         </Popover>
 
-        {/* Date Picker */}
         <Popover open={dateOpen} onOpenChange={setDateOpen}>
           <PopoverTrigger asChild>
             <button className="flex-1 flex items-center justify-center gap-2 bg-card rounded-2xl py-3 px-4 border border-border hover:border-primary/30 transition-colors">
@@ -270,13 +159,7 @@ const PredictionsView = () => {
             <CalendarComponent
               mode="single"
               selected={selectedDate}
-              onSelect={(date) => {
-                if (date) {
-                  setSelectedDate(date);
-                  setDateOpen(false);
-                }
-              }}
-              disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+              onSelect={(date) => { if (date) { setSelectedDate(date); setDateOpen(false); } }}
               initialFocus
               className={cn("p-3 pointer-events-auto")}
             />
@@ -284,106 +167,100 @@ const PredictionsView = () => {
         </Popover>
       </div>
 
-      {/* Main Prediction Card */}
+      {/* Main forecast card */}
       <div className="card-elevated p-5 transition-all duration-300">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-4">
+        <div className="flex items-start justify-between mb-2">
           <div className="text-right">
             <h3 className="font-bold text-lg">תפוסה צפויה</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              {predictedFree} מקומות פנויים צפויים מתוך {totalSpots}
+            </p>
           </div>
           <div className="text-left">
-            <span className="text-5xl font-bold text-primary tabular-nums">
-              {currentOccupancy}%
-            </span>
-            <p className="text-sm text-muted-foreground mt-1">צפוי</p>
+            <span className="text-5xl font-bold text-primary tabular-nums">{currentOccupancy}%</span>
+            <p className="text-sm text-muted-foreground mt-1">תפוס</p>
           </div>
         </div>
 
-        {/* Chart */}
-        <div className="h-48 mt-4">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={occupancyData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-              <defs>
-                <linearGradient id="predictionGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.25} />
-                  <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                </linearGradient>
-                <filter id="blurFilter">
-                  <feGaussianBlur in="SourceGraphic" stdDeviation={blurAmount} />
-                </filter>
-              </defs>
-              <XAxis
-                dataKey="hour"
-                type="number"
-                domain={[6, 18]}
-                allowDataOverflow={false}
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                tickFormatter={(val) => `${val < 10 ? '0' : ''}${val}:00`}
-                ticks={[6, 8, 10, 12, 14, 16, 18]}
-              />
-              <Area
-                type="monotone"
-                dataKey="value"
-                stroke="hsl(var(--primary))"
-                strokeWidth={3}
-                fill="url(#predictionGradient)"
-                animationDuration={500}
-              />
-              {/* Animated Reference Dot */}
-              <ReferenceDot
-                x={animatedHour}
-                y={currentOccupancy}
-                r={8}
-                fill="hsl(var(--primary))"
-                stroke="hsl(var(--card))"
-                strokeWidth={3}
-                style={{
-                  filter: isMoving ? "url(#blurFilter)" : "none",
-                  transition: "none" // We handle animation via JS
-                }}
-                isFront
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+        {/* Chart with confidence band */}
+        <div className="h-52 mt-4">
+          {chartData.length === 0 ? (
+            <div className="h-full flex items-center justify-center text-muted-foreground gap-2">
+              <Loader2 className="w-5 h-5 animate-spin" /> טוען תחזית…
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="medianGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                  </linearGradient>
+                  <filter id="blurFilter"><feGaussianBlur in="SourceGraphic" stdDeviation={blurAmount} /></filter>
+                </defs>
+                <XAxis
+                  dataKey="hour" type="number" domain={[HOUR_MIN, HOUR_MAX]}
+                  axisLine={false} tickLine={false}
+                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                  tickFormatter={(v) => fmtHour(v)} ticks={[6, 9, 12, 15, 18, 21]}
+                />
+                <YAxis domain={[0, 100]} hide />
+                <Tooltip
+                  formatter={(val: unknown, name: string) =>
+                    name === "occ" ? [`${val}%`, "חציון"] : [`${(val as number[])[0]}–${(val as number[])[1]}%`, "טווח"]}
+                  labelFormatter={(h) => fmtHour(Number(h))}
+                  contentStyle={{ borderRadius: 12, fontSize: 12 }}
+                />
+                {/* P10–P90 confidence band */}
+                <Area
+                  type="monotone" dataKey="band" stroke="none"
+                  fill="hsl(var(--primary))" fillOpacity={0.12} animationDuration={500} isAnimationActive
+                />
+                {/* median line */}
+                <Area
+                  type="monotone" dataKey="occ" stroke="hsl(var(--primary))" strokeWidth={3}
+                  fill="url(#medianGrad)" animationDuration={500}
+                />
+                <ReferenceDot
+                  x={animatedHour} y={currentOccupancy} r={7}
+                  fill="hsl(var(--primary))" stroke="hsl(var(--card))" strokeWidth={3}
+                  style={{ filter: velocity > 0.01 ? "url(#blurFilter)" : "none" }} isFront
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
         </div>
 
-        {/* Peak info */}
         <div className="flex items-center gap-2 mt-4 text-sm text-muted-foreground">
           <span className="w-2 h-2 rounded-full bg-primary" />
-          <span>
-            שעה נבחרת: {formatHourToTime(animatedHour)} - תפוסה צפויה: {currentOccupancy}%
-          </span>
+          <span>שעה נבחרת: {fmtHour(animatedHour)} · תפוסה חזויה {currentOccupancy}% (טווח 80%)</span>
         </div>
       </div>
 
-      {/* Best Time Cards */}
+      {/* Best time to arrive */}
       <div className="space-y-3">
         <h3 className="font-semibold text-sm text-muted-foreground">זמן מומלץ להגעה</h3>
-
         <div className="card-elevated p-4 flex items-center gap-4 border-2 border-primary/20">
           <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center">
             <Sparkles className="w-6 h-6 text-primary-foreground" />
           </div>
           <div className="flex-1 text-right">
-            <h4 className="font-semibold text-base">{bestPredictionPoint.time}</h4>
-            <p className="text-sm text-muted-foreground">{Math.max(0, 100 - bestPredictionPoint.value)}% סיכוי למצוא חנייה מהר</p>
+            <h4 className="font-semibold text-base">{bestPoint ? fmtHour(bestPoint.hour) : "—"}</h4>
+            <p className="text-sm text-muted-foreground">
+              {bestPoint ? `${Math.max(0, 100 - bestPoint.occ)}% סיכוי למצוא חנייה מהר (השעה הפנויה ביותר)` : "טוען…"}
+            </p>
           </div>
         </div>
-
         <div className="card-elevated p-4 flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center">
             <CloudSun className="w-6 h-6 text-muted-foreground" />
           </div>
           <div className="flex-1 text-right">
-            <h4 className="font-semibold text-base">
-              {nextImprovementPoint ? nextImprovementPoint.time : "אין שיפור צפוי"}
-            </h4>
+            <h4 className="font-semibold text-base">{forecast?.isHoliday ? "יום חג" : "יום רגיל"}</h4>
             <p className="text-sm text-muted-foreground">
-              {nextImprovementPoint
-                ? `${Math.max(0, 100 - nextImprovementPoint.value)}% סיכוי למצוא חנייה מהר`
-                : "התחזית מהשרת אינה מציגה חלון טוב יותר בהמשך היום"}
+              {forecast?.isHoliday
+                ? "בחגים התפוסה נמוכה משמעותית — קל יותר למצוא חנייה"
+                : "התחזית מבוססת על דפוסי הביקוש ההיסטוריים של האזור"}
             </p>
           </div>
         </div>

@@ -142,3 +142,38 @@ export function useLotPredictionSeries(lotId: string | null, targetTimestamps: s
     })),
   });
 }
+
+// ── Full-day forecast with confidence band (XGBoost quantile model) ──
+export interface ForecastPoint {
+  hour: number;
+  occupancyPct: number;
+  freeMedian: number;
+  freeLower: number;
+  freeUpper: number;
+}
+export interface DayForecast {
+  date: string;
+  totalSlots: number;
+  isHoliday: boolean;
+  holidayName: string | null;
+  points: ForecastPoint[];
+}
+
+// Calls the ML service's /forecast (via the Vite "/ml" proxy) for one date.
+export function useDayForecast(dateYmd: string | null, totalSlots: number) {
+  return useQuery({
+    queryKey: ["forecast", dateYmd, totalSlots],
+    queryFn: async (): Promise<DayForecast> => {
+      const res = await fetch("/ml/forecast", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: dateYmd, totalSlots }),
+      });
+      if (!res.ok) throw new Error("forecast " + res.status);
+      return res.json();
+    },
+    enabled: Boolean(dateYmd && totalSlots > 0),
+    staleTime: 60_000,
+    retry: false,
+  });
+}
