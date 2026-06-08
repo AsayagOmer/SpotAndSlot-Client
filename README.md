@@ -1,73 +1,70 @@
-# Welcome to your Lovable project
+# Spot&Slot — Smart Parking client
 
-## Project info
+The web client for the Smart Parking system (course: *Ambient Invisible
+Intelligence*). It is a **thin client** over the Smart Parking REST API — every
+number it shows comes from the server, not from mock data.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+Built with **Vite + React + TypeScript + shadcn/ui + Tailwind CSS** and
+**TanStack Query**.
 
-## How can I edit this code?
+## Views
 
-There are several ways of editing your application.
+| Route | View | What it shows |
+|---|---|---|
+| `/` | **Live** (default tab) | The parking lot in real time — sections and slots, occupancy %, handicap spots. Polls the API every ~5 s. |
+| `/` | **Predictions** tab | A full-day availability forecast from the ML model, drawn as a median curve with a **P10–P90 confidence band**, plus holiday awareness. Varies by the selected date. |
+| `/admin` | **Admin console** | System overview (lots / sections / slots / free / faulty), per-lot health with a **Run health check** action, the **users** list, and the **command-history** activity feed. Reached via the shield icon in the header. |
 
-**Use Lovable**
+## How it talks to the backend
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+| Concern | File |
+|---|---|
+| API base URL, system id, identity | `.env` (see `.env.example`) |
+| Typed API client (objects, commands, users, admin) | `src/lib/api.ts` |
+| Data fetching, polling, slot mapping | `src/hooks/useParkingData.ts` |
+| Live lot map | `src/components/ParkingLotMap.tsx` |
+| Predictions (forecast + band) | `src/components/PredictionsView.tsx` |
+| Admin dashboard | `src/pages/Admin.tsx` |
 
-Changes made via Lovable will be committed automatically to this repo.
+- **API calls** go to `VITE_API_BASE_URL` (the Spring server,
+  `/ambient-invisible-intelligence`).
+- **The forecast** is fetched from the ML service's `/forecast` endpoint through
+  a Vite dev proxy: the browser calls `/ml/forecast` (same-origin) and Vite
+  forwards it to `http://localhost:5000` (see `vite.config.ts`).
 
-**Use your preferred IDE**
+### Configuration (`.env`)
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+Copy `.env.example` to `.env` to override the defaults:
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```
+VITE_API_BASE_URL=http://localhost:8084/ambient-invisible-intelligence
+VITE_SYSTEM_ID=2026b.Omer.Asayag
+VITE_API_VERSION=1.3
+VITE_USER_EMAIL=admin@demo.org
 ```
 
-**Edit a file directly in GitHub**
+The same values are also the built-in fallbacks in `src/lib/api.ts`, so the app
+runs against a local server even without a `.env`.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Run
 
-**Use GitHub Codespaces**
+```sh
+npm install      # first time only
+npm run dev      # http://localhost:8080
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Prerequisites for full functionality:
 
-## What technologies are used for this project?
+- the **Smart Parking API** on `http://localhost:8084` (see the repo root README)
+- the **ML prediction service** on `http://localhost:5000` for the Predictions tab
+  (the Live and Admin views work without it)
 
-This project is built with:
+Other scripts: `npm run build` (production build), `npm run lint`.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Notes
 
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- If the API is unreachable, the Live and Admin views show a clear
+  "no connection" state with a retry, instead of crashing.
+- The slot grid maps API data as: `REGULAR/FREE → available`,
+  `REGULAR/OCCUPIED → occupied`, `HANDICAP/FREE → disabled-available`,
+  `HANDICAP/OCCUPIED → disabled-occupied`.
