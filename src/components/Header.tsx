@@ -1,4 +1,5 @@
-
+import { Link } from "react-router-dom";
+import { Shield } from "lucide-react";
 
 const Header = () => {
   return (
@@ -10,8 +11,14 @@ const Header = () => {
           <span className="text-primary">&</span>
           <span className="text-secondary">Slot</span>
         </h1>
-
-
+        <Link
+          to="/admin"
+          aria-label="לוח בקרה למנהל"
+          title="לוח בקרה למנהל"
+          className="justify-self-end w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-muted transition-colors"
+        >
+          <Shield className="w-5 h-5" />
+        </Link>
       </div>
     </header>
   );

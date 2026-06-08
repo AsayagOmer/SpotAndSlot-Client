@@ -168,3 +168,42 @@ export async function bestSectionInLot(lotId: string): Promise<BestSectionResult
   const [result] = (await invokeCommand("bestSectionInLot", lotId, {})) as BestSectionResult[];
   return result;
 }
+
+// ── Admin endpoints ───────────────────────────────────────────────────────────
+
+export interface UserBoundary {
+  userId: { email: string; systemID: string };
+  role: string;
+  username?: string;
+  avatar?: string;
+}
+
+export async function getAllUsers(): Promise<UserBoundary[]> {
+  const res = await fetch(`${BASE_URL}/admin/users`, { headers: headers() });
+  return handle<UserBoundary[]>(res);
+}
+
+export interface CommandHistoryItem {
+  id?: { commandId: string; systemID: string };
+  command: string;
+  targetObject?: { id: ObjectId };
+  invocationTimestamp?: string;
+  invokedBy?: { userId: { email: string; systemID: string } };
+  commandAttributes?: Record<string, unknown>;
+}
+
+export async function getAllCommands(): Promise<CommandHistoryItem[]> {
+  const res = await fetch(`${BASE_URL}/admin/commands`, { headers: headers() });
+  return handle<CommandHistoryItem[]>(res);
+}
+
+// Run a lot-level health check (UC-10). Returns any slots with non-OK health.
+export interface FaultySlot {
+  slotId: string;
+  alias: string;
+  healthStatus: string;
+}
+
+export async function runHealthCheck(lotId: string): Promise<FaultySlot[]> {
+  return (await invokeCommand("runHealthCheck", lotId, {})) as FaultySlot[];
+}

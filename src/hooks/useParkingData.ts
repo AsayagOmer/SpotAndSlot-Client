@@ -1,6 +1,8 @@
 import { useQueries, useQuery } from "@tanstack/react-query";
 import {
   getAllObjects,
+  getAllUsers,
+  getAllCommands,
   predictAvailability,
   ObjectType,
   type ObjectBoundary,
@@ -157,6 +159,20 @@ export interface DayForecast {
   isHoliday: boolean;
   holidayName: string | null;
   points: ForecastPoint[];
+}
+
+// Raw objects (shares the cache/queryKey with useParkingData), polled.
+export function useAllObjects(pollMs = 5000) {
+  return useQuery({ queryKey: ["parking-objects"], queryFn: getAllObjects, refetchInterval: pollMs });
+}
+
+// ── Admin data (users + command history), polled ──
+export function useAdminUsers(pollMs = 8000) {
+  return useQuery({ queryKey: ["admin-users"], queryFn: getAllUsers, refetchInterval: pollMs });
+}
+
+export function useAdminCommands(pollMs = 5000) {
+  return useQuery({ queryKey: ["admin-commands"], queryFn: getAllCommands, refetchInterval: pollMs });
 }
 
 // Calls the ML service's /forecast (via the Vite "/ml" proxy) for one date.
