@@ -9,9 +9,22 @@
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8084/ambient-invisible-intelligence";
 const SYSTEM_ID = import.meta.env.VITE_SYSTEM_ID ?? "2026b.Omer.Asayag";
 const API_VERSION = import.meta.env.VITE_API_VERSION ?? "1.3";
-const USER_EMAIL = import.meta.env.VITE_USER_EMAIL ?? "admin@demo.org";
 
-export const apiConfig = { BASE_URL, SYSTEM_ID, API_VERSION, USER_EMAIL };
+export const apiConfig = { BASE_URL, SYSTEM_ID, API_VERSION };
+
+// ── Current identity ─────────────────────────────────────────────────────────
+// Set by the auth provider after login; stamped on invokedBy/createdBy and the
+// userEmail guard params. Falls back to the env identity for tooling/dev use.
+const FALLBACK_USER_EMAIL = import.meta.env.VITE_USER_EMAIL ?? "";
+let currentUserEmail: string = FALLBACK_USER_EMAIL;
+
+export function setCurrentUserEmail(email: string | null): void {
+  currentUserEmail = email ?? FALLBACK_USER_EMAIL;
+}
+
+export function getCurrentUserEmail(): string {
+  return currentUserEmail;
+}
 
 // ── Boundary types (match the server's JSON shapes) ──────────────────────────
 
@@ -27,6 +40,7 @@ export interface ObjectBoundary {
   status?: string;
   active?: boolean;
   creationTimestamp?: string;
+  createdBy?: { userId: { email: string; systemID: string } };
   location?: { lat: number; lng: number };
   objectDetails?: Record<string, unknown>;
 }
@@ -91,6 +105,40 @@ export async function getObject(objectId: string): Promise<ObjectBoundary> {
   return handle<ObjectBoundary>(res);
 }
 
+// Create a parking object as the signed-in admin (server enforces ADMIN + lot ownership).
+export async function createObject(input: ObjectBoundary): Promise<ObjectBoundary> {
+  const body: ObjectBoundary = {
+    ...input,
+    createdBy: input.createdBy ?? { userId: { email: currentUserEmail, systemID: SYSTEM_ID } },
+  };
+  const res = await fetch(`${BASE_URL}/objects`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify(body),
+  });
+  return handle<ObjectBoundary>(res);
+}
+
+export async function updateObject(objectId: string, update: Partial<ObjectBoundary>): Promise<void> {
+  const params = new URLSearchParams({ userEmail: currentUserEmail });
+  const res = await fetch(`${BASE_URL}/objects/${SYSTEM_ID}/${objectId}?${params}`, {
+    method: "PUT",
+    headers: headers(),
+    body: JSON.stringify(update),
+  });
+  await handle<void>(res);
+}
+
+// Delete an object; the server cascades (lot -> sections + slots, section -> slots).
+export async function deleteObject(objectId: string): Promise<void> {
+  const params = new URLSearchParams({ userEmail: currentUserEmail });
+  const res = await fetch(`${BASE_URL}/objects/${SYSTEM_ID}/${objectId}?${params}`, {
+    method: "DELETE",
+    headers: headers(),
+  });
+  await handle<void>(res);
+}
+
 // ── Commands ─────────────────────────────────────────────────────────────────
 
 export async function invokeCommand(
@@ -101,7 +149,7 @@ export async function invokeCommand(
   const body: CommandBoundary = {
     command,
     targetObject: { id: { objectId: targetObjectId, systemID: SYSTEM_ID } },
-    invokedBy: { userId: { email: USER_EMAIL, systemID: SYSTEM_ID } },
+    invokedBy: { userId: { email: currentUserEmail, systemID: SYSTEM_ID } },
     commandAttributes,
   };
   const res = await fetch(`${BASE_URL}/commands`, {
@@ -169,7 +217,7 @@ export async function bestSectionInLot(lotId: string): Promise<BestSectionResult
   return result;
 }
 
-// ── Admin endpoints ───────────────────────────────────────────────────────────
+// ── Users / auth ─────────────────────────────────────────────────────────────
 
 export interface UserBoundary {
   userId: { email: string; systemID: string };
@@ -177,6 +225,48 @@ export interface UserBoundary {
   username?: string;
   avatar?: string;
 }
+
+// Stateless login: returns the user's boundary (role included) or throws on 401.
+export async function loginUser(email: string, password: string): Promise<UserBoundary> {
+  const params = new URLSearchParams({ password });
+  const res = await fetch(
+    `${BASE_URL}/users/login/${SYSTEM_ID}/${encodeURIComponent(email)}?${params}`,
+    { headers: headers() },
+  );
+  return handle<UserBoundary>(res);
+}
+
+export interface NewUserInput {
+  email: string;
+  password: string;
+  username?: string;
+  avatar?: string;
+}
+
+// Public self sign-up — always creates an END_USER account.
+export async function signUp(input: NewUserInput): Promise<UserBoundary> {
+  const res = await fetch(`${BASE_URL}/users`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ ...input, role: "END_USER" }),
+  });
+  return handle<UserBoundary>(res);
+}
+
+// Create a user with an elevated role; the server requires the acting admin.
+export async function createUserAsAdmin(
+  input: NewUserInput & { role: string },
+): Promise<UserBoundary> {
+  const params = new URLSearchParams({ actingEmail: currentUserEmail });
+  const res = await fetch(`${BASE_URL}/users?${params}`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify(input),
+  });
+  return handle<UserBoundary>(res);
+}
+
+// ── Admin endpoints ───────────────────────────────────────────────────────────
 
 export async function getAllUsers(): Promise<UserBoundary[]> {
   const res = await fetch(`${BASE_URL}/admin/users`, { headers: headers() });

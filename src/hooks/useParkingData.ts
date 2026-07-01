@@ -8,6 +8,7 @@ import {
   type ObjectBoundary,
   type SlotDetails,
 } from "@/lib/api";
+import { useSelectedLot } from "@/lib/selectedLot";
 
 // GUI-facing status model used by <ParkingSpot />
 export type SpotStatus =
@@ -59,12 +60,13 @@ function naturalCompare(a: string, b: string): number {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
 }
 
-function shapeParkingData(objects: ObjectBoundary[]): ParkingData {
+function shapeParkingData(objects: ObjectBoundary[], selectedLotId: string | null): ParkingData {
   const lots = objects.filter((o) => o.type === ObjectType.PARKING_LOT);
   const sections = objects.filter((o) => o.type === ObjectType.PARKING_SECTION);
   const slots = objects.filter((o) => o.type === ObjectType.PARKING_SLOT && o.active !== false);
 
-  const lot = lots[0] ?? null;
+  // shape the lot the user selected; fall back to the first lot
+  const lot = lots.find((l) => l.id?.objectId === selectedLotId) ?? lots[0] ?? null;
   const lotId = lot?.id?.objectId ?? null;
 
   // Group slots by their parent section
@@ -104,8 +106,9 @@ function shapeParkingData(objects: ObjectBoundary[]): ParkingData {
   };
 }
 
-// Live parking data, polled from the API every few seconds
+// Live parking data for the currently selected lot, polled from the API
 export function useParkingData(pollMs = 5000) {
+  const { selectedLotId } = useSelectedLot();
   const query = useQuery({
     queryKey: ["parking-objects"],
     queryFn: getAllObjects,
@@ -113,7 +116,7 @@ export function useParkingData(pollMs = 5000) {
     refetchOnWindowFocus: true,
   });
 
-  const data = query.data ? shapeParkingData(query.data) : undefined;
+  const data = query.data ? shapeParkingData(query.data, selectedLotId) : undefined;
 
   return {
     ...query,
