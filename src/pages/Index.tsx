@@ -5,6 +5,7 @@ import Header from "@/components/Header";
 import TabSwitcher from "@/components/TabSwitcher";
 import ParkingLotMap from "@/components/ParkingLotMap";
 import PredictionsView from "@/components/PredictionsView";
+import LotSelector from "@/components/LotSelector";
 import { useParkingData } from "@/hooks/useParkingData";
 
 const Index = () => {
@@ -55,7 +56,8 @@ const Index = () => {
 
       <main className="container max-w-md mx-auto px-4 pb-5 space-y-5">
         {/* Sticky Tab Switcher Container */}
-        <div className="sticky top-0 z-50 py-4 -mx-4 px-4 bg-background/95 backdrop-blur-xl border-b border-border/60 shadow-md transition-all duration-300">
+        <div className="sticky top-0 z-50 py-4 -mx-4 px-4 bg-background/95 backdrop-blur-xl border-b border-border/60 shadow-md transition-all duration-300 space-y-3">
+          <LotSelector />
           <TabSwitcher activeTab={activeViewTab} onTabChange={setActiveViewTab} />
         </div>
 
