@@ -9,6 +9,8 @@ import { useAuth } from "@/lib/auth";
 
 // Public self sign-up. New accounts are always END_USER; admins and operators
 // are created from the admin console by an existing administrator.
+const AVATARS = ["🙂", "😎", "🚗", "🅿️", "🦸", "🌟"];
+
 const Signup = () => {
   const { signup } = useAuth();
   const navigate = useNavigate();
@@ -16,6 +18,7 @@ const Signup = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [avatar, setAvatar] = useState(AVATARS[0]);
   const [busy, setBusy] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -24,9 +27,14 @@ const Signup = () => {
       toast.error("הסיסמאות אינן תואמות", { position: "top-center" });
       return;
     }
+    // the server requires a non-blank username and avatar
+    if (!username.trim()) {
+      toast.error("יש להזין שם מלא", { position: "top-center" });
+      return;
+    }
     setBusy(true);
     try {
-      await signup({ email: email.trim(), password, username: username.trim() || undefined });
+      await signup({ email: email.trim(), password, username: username.trim(), avatar });
       toast.success("החשבון נוצר — ברוך הבא!", { position: "top-center" });
       navigate("/", { replace: true });
     } catch (err) {
@@ -68,7 +76,27 @@ const Signup = () => {
               placeholder="ישראל ישראלי"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
+              required
             />
+          </div>
+          <div className="space-y-2">
+            <Label>אווטאר</Label>
+            <div className="flex gap-2 flex-wrap">
+              {AVATARS.map((a) => (
+                <button
+                  key={a}
+                  type="button"
+                  onClick={() => setAvatar(a)}
+                  className={`w-10 h-10 rounded-xl text-xl flex items-center justify-center border transition-colors ${
+                    avatar === a
+                      ? "border-primary bg-primary/10"
+                      : "border-border bg-card hover:border-primary/40"
+                  }`}
+                >
+                  {a}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="email">אימייל</Label>
