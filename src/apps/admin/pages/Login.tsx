@@ -1,14 +1,16 @@
 import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { LogIn, Loader2, ParkingSquare } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { Shield, LogIn, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 
+// Desktop admin sign-in. Only ADMIN accounts may enter the console;
+// end users belong in the mobile app.
 const Login = () => {
-  const { login } = useAuth();
+  const { login, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState("");
@@ -21,12 +23,18 @@ const Login = () => {
     setBusy(true);
     try {
       const user = await login(email.trim(), password);
-      toast.success(`ברוך הבא, ${user.username || user.email}!`, { position: "top-center" });
-      // admins land on their console; everyone else on the live map.
+      if (user.role !== "ADMIN") {
+        logout();
+        toast.error("Administrator account required", {
+          description: "This console is for parking-lot administrators. Drivers should use the Spot&Slot mobile app.",
+        });
+        return;
+      }
+      toast.success(`Welcome back, ${user.username || user.email}`);
       const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
-      navigate(user.role === "ADMIN" ? from ?? "/admin" : from ?? "/", { replace: true });
+      navigate(from ?? "/", { replace: true });
     } catch {
-      toast.error("התחברות נכשלה — בדוק אימייל וסיסמה", { position: "top-center" });
+      toast.error("Sign-in failed — check your email and password");
     } finally {
       setBusy(false);
     }
@@ -38,37 +46,36 @@ const Login = () => {
         {/* Brand */}
         <div className="text-center space-y-2">
           <div className="mx-auto w-14 h-14 rounded-2xl bg-primary/15 text-primary flex items-center justify-center">
-            <ParkingSquare className="w-7 h-7" />
+            <Shield className="w-7 h-7" />
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">
             <span className="text-secondary">Spot</span>
             <span className="text-primary">&</span>
             <span className="text-secondary">Slot</span>
+            <span className="text-muted-foreground font-normal"> · Admin</span>
           </h1>
-          <p className="text-sm text-muted-foreground">התחבר כדי לצפות בחניונים בזמן אמת</p>
+          <p className="text-sm text-muted-foreground">Sign in to manage your parking lots</p>
         </div>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="card-elevated p-6 space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email">אימייל</Label>
+            <Label htmlFor="email">Email</Label>
             <Input
               id="email"
               type="email"
-              dir="ltr"
               autoComplete="email"
-              placeholder="you@example.com"
+              placeholder="admin@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">סיסמה</Label>
+            <Label htmlFor="password">Password</Label>
             <Input
               id="password"
               type="password"
-              dir="ltr"
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -76,16 +83,13 @@ const Login = () => {
             />
           </div>
           <Button type="submit" className="w-full" disabled={busy}>
-            {busy ? <Loader2 className="w-4 h-4 ml-2 animate-spin" /> : <LogIn className="w-4 h-4 ml-2" />}
-            התחבר
+            {busy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <LogIn className="w-4 h-4 mr-2" />}
+            Sign in
           </Button>
         </form>
 
-        <p className="text-center text-sm text-muted-foreground">
-          אין לך חשבון?{" "}
-          <Link to="/signup" className="text-primary font-medium hover:underline">
-            הירשם עכשיו
-          </Link>
+        <p className="text-center text-xs text-muted-foreground">
+          Administrator accounts are created by an existing admin from the Users page.
         </p>
       </div>
     </div>

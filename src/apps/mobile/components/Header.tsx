@@ -1,9 +1,10 @@
-import { Link } from "react-router-dom";
-import { LogOut, Shield } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
+// Mobile app header: brand + signed-in user. Administration is handled by the
+// separate desktop admin app, so there is no admin entry here.
 const Header = () => {
-  const { user, isAdmin, logout } = useAuth();
+  const { user, logout } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 bg-card/80 backdrop-blur-lg border-b border-border px-4 py-3">
@@ -33,19 +34,7 @@ const Header = () => {
           <span className="text-secondary">Slot</span>
         </h1>
 
-        {/* admin console entry — admins only */}
-        <div className="justify-self-end">
-          {isAdmin && (
-            <Link
-              to="/admin"
-              aria-label="לוח בקרה למנהל"
-              title="לוח בקרה למנהל"
-              className="w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-muted transition-colors"
-            >
-              <Shield className="w-5 h-5" />
-            </Link>
-          )}
-        </div>
+        <div />
       </div>
     </header>
   );

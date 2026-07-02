@@ -7,13 +7,14 @@ import { AuthProvider } from "@/lib/auth";
 import { SelectedLotProvider } from "@/lib/selectedLot";
 import RequireAuth from "@/components/RequireAuth";
 import Index from "./pages/Index";
-import Admin from "./pages/Admin";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
-import NotFound from "./pages/NotFound";
+import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
 
+// End-user mobile app: live map, predictions, and lot selection.
+// Administration lives in the separate desktop admin app (src/apps/admin).
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -30,14 +31,6 @@ const App = () => (
                 element={
                   <RequireAuth>
                     <Index />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="/admin"
-                element={
-                  <RequireAuth role="ADMIN">
-                    <Admin />
                   </RequireAuth>
                 }
               />

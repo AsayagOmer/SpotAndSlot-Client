@@ -4,12 +4,20 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
-// https://vitejs.dev/config/
+// Mobile (end-user) app: served in dev on :8080, built to dist/mobile, and
+// wrapped by Capacitor into the Android app (see capacitor.config.ts).
 export default defineConfig(({ mode }) => ({
+  root: path.resolve(__dirname, "mobile"),
+  publicDir: path.resolve(__dirname, "public"),
+  build: {
+    outDir: path.resolve(__dirname, "dist/mobile"),
+    emptyOutDir: true,
+  },
   server: {
     host: "::",
     port: 8080,
     // Proxy ML-service calls so the browser reaches it same-origin (no CORS).
+    // The native (Capacitor) build calls the ML service directly instead.
     proxy: {
       "/ml": {
         target: "http://localhost:5000",

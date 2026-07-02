@@ -6,11 +6,66 @@
 // (package `ambient_invisible_intelligence`, base path `/ambient-invisible-intelligence`).
 // ─────────────────────────────────────────────────────────────────────────────
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8084/ambient-invisible-intelligence";
+const DEFAULT_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8084/ambient-invisible-intelligence";
 const SYSTEM_ID = import.meta.env.VITE_SYSTEM_ID ?? "2026b.Omer.Asayag";
 const API_VERSION = import.meta.env.VITE_API_VERSION ?? "1.3";
+const SERVER_KEY = "spot-insight.server-base";
 
-export const apiConfig = { BASE_URL, SYSTEM_ID, API_VERSION };
+// ── Server address ───────────────────────────────────────────────────────────
+// On a phone "localhost" is the phone itself, so the mobile app lets the user
+// point at the API server (e.g. http://192.168.1.20:8084/...). The choice is
+// persisted; the default comes from the build-time env.
+function loadServerBase(): string {
+  try {
+    return localStorage.getItem(SERVER_KEY) || DEFAULT_BASE_URL;
+  } catch {
+    return DEFAULT_BASE_URL;
+  }
+}
+
+let BASE_URL = loadServerBase();
+
+export function getServerBase(): string {
+  return BASE_URL;
+}
+
+export function setServerBase(url: string | null): void {
+  const clean = url?.trim().replace(/\/+$/, "") ?? "";
+  BASE_URL = clean || DEFAULT_BASE_URL;
+  try {
+    if (clean) localStorage.setItem(SERVER_KEY, BASE_URL);
+    else localStorage.removeItem(SERVER_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+// Running inside the Capacitor (Android) shell?
+function isNative(): boolean {
+  const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
+  return Boolean(cap?.isNativePlatform?.());
+}
+
+// URL for the ML prediction service. In web dev the Vite proxy forwards
+// /ml → localhost:5000; the native app has no proxy, so it calls the service
+// directly on the API server's host.
+export function mlUrl(path: string): string {
+  if (!isNative()) return `/ml${path}`;
+  try {
+    const u = new URL(BASE_URL);
+    return `${u.protocol}//${u.hostname}:5000${path}`;
+  } catch {
+    return `/ml${path}`;
+  }
+}
+
+export const apiConfig = {
+  get BASE_URL() {
+    return BASE_URL;
+  },
+  SYSTEM_ID,
+  API_VERSION,
+};
 
 // ── Current identity ─────────────────────────────────────────────────────────
 // Set by the auth provider after login; stamped on invokedBy/createdBy and the

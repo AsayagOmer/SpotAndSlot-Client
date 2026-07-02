@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Bell } from "lucide-react";
 import { toast } from "sonner";
-import Header from "@/components/Header";
+import Header from "../components/Header";
 import TabSwitcher from "@/components/TabSwitcher";
 import ParkingLotMap from "@/components/ParkingLotMap";
 import PredictionsView from "@/components/PredictionsView";
