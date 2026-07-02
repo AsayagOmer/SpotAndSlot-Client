@@ -68,18 +68,33 @@ export const apiConfig = {
 };
 
 // ── Current identity ─────────────────────────────────────────────────────────
-// Set by the auth provider after login; stamped on invokedBy/createdBy and the
-// userEmail guard params. Falls back to the env identity for tooling/dev use.
+// Set by the auth provider after login. Sprint 4 authenticates every API call
+// with userSystemID / userEmail / userPassword request parameters (creation and
+// commands carry only userPassword), so the signed-in password is kept too.
 const FALLBACK_USER_EMAIL = import.meta.env.VITE_USER_EMAIL ?? "";
 let currentUserEmail: string = FALLBACK_USER_EMAIL;
+let currentUserPassword: string = "";
 
-export function setCurrentUserEmail(email: string | null): void {
+export function setCurrentUser(email: string | null, password: string | null): void {
   currentUserEmail = email ?? FALLBACK_USER_EMAIL;
+  currentUserPassword = password ?? "";
 }
 
 export function getCurrentUserEmail(): string {
   return currentUserEmail;
 }
+
+// the credential trio attached to Sprint 4 authenticated requests
+function creds(): URLSearchParams {
+  return new URLSearchParams({
+    userSystemID: SYSTEM_ID,
+    userEmail: currentUserEmail,
+    userPassword: currentUserPassword,
+  });
+}
+
+// large page so list views (map, admin tables) see the whole dataset
+const LIST_PAGING = "size=1000&page=0";
 
 // ── Boundary types (match the server's JSON shapes) ──────────────────────────
 
@@ -151,12 +166,12 @@ async function handle<T>(res: Response): Promise<T> {
 // ── Objects ──────────────────────────────────────────────────────────────────
 
 export async function getAllObjects(): Promise<ObjectBoundary[]> {
-  const res = await fetch(`${BASE_URL}/objects`, { headers: headers() });
+  const res = await fetch(`${BASE_URL}/objects?${creds()}&${LIST_PAGING}`, { headers: headers() });
   return handle<ObjectBoundary[]>(res);
 }
 
 export async function getObject(objectId: string): Promise<ObjectBoundary> {
-  const res = await fetch(`${BASE_URL}/objects/${SYSTEM_ID}/${objectId}`, { headers: headers() });
+  const res = await fetch(`${BASE_URL}/objects/${SYSTEM_ID}/${objectId}?${creds()}`, { headers: headers() });
   return handle<ObjectBoundary>(res);
 }
 
@@ -166,7 +181,7 @@ export async function createObject(input: ObjectBoundary): Promise<ObjectBoundar
     ...input,
     createdBy: input.createdBy ?? { userId: { email: currentUserEmail, systemID: SYSTEM_ID } },
   };
-  const res = await fetch(`${BASE_URL}/objects`, {
+  const res = await fetch(`${BASE_URL}/objects?${new URLSearchParams({ userPassword: currentUserPassword })}`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify(body),
@@ -175,8 +190,7 @@ export async function createObject(input: ObjectBoundary): Promise<ObjectBoundar
 }
 
 export async function updateObject(objectId: string, update: Partial<ObjectBoundary>): Promise<void> {
-  const params = new URLSearchParams({ userEmail: currentUserEmail });
-  const res = await fetch(`${BASE_URL}/objects/${SYSTEM_ID}/${objectId}?${params}`, {
+  const res = await fetch(`${BASE_URL}/objects/${SYSTEM_ID}/${objectId}?${creds()}`, {
     method: "PUT",
     headers: headers(),
     body: JSON.stringify(update),
@@ -186,8 +200,7 @@ export async function updateObject(objectId: string, update: Partial<ObjectBound
 
 // Delete an object; the server cascades (lot -> sections + slots, section -> slots).
 export async function deleteObject(objectId: string): Promise<void> {
-  const params = new URLSearchParams({ userEmail: currentUserEmail });
-  const res = await fetch(`${BASE_URL}/objects/${SYSTEM_ID}/${objectId}?${params}`, {
+  const res = await fetch(`${BASE_URL}/objects/${SYSTEM_ID}/${objectId}?${creds()}`, {
     method: "DELETE",
     headers: headers(),
   });
@@ -207,7 +220,7 @@ export async function invokeCommand(
     invokedBy: { userId: { email: currentUserEmail, systemID: SYSTEM_ID } },
     commandAttributes,
   };
-  const res = await fetch(`${BASE_URL}/commands`, {
+  const res = await fetch(`${BASE_URL}/commands?${new URLSearchParams({ userPassword: currentUserPassword })}`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify(body),
@@ -324,7 +337,7 @@ export async function createUserAsAdmin(
 // ── Admin endpoints ───────────────────────────────────────────────────────────
 
 export async function getAllUsers(): Promise<UserBoundary[]> {
-  const res = await fetch(`${BASE_URL}/admin/users`, { headers: headers() });
+  const res = await fetch(`${BASE_URL}/admin/users?${creds()}&${LIST_PAGING}`, { headers: headers() });
   return handle<UserBoundary[]>(res);
 }
 
@@ -338,7 +351,7 @@ export interface CommandHistoryItem {
 }
 
 export async function getAllCommands(): Promise<CommandHistoryItem[]> {
-  const res = await fetch(`${BASE_URL}/admin/commands`, { headers: headers() });
+  const res = await fetch(`${BASE_URL}/admin/commands?${creds()}&${LIST_PAGING}`, { headers: headers() });
   return handle<CommandHistoryItem[]>(res);
 }
 

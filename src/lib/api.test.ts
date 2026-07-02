@@ -4,7 +4,7 @@ import {
   getCurrentUserEmail,
   getServerBase,
   mlUrl,
-  setCurrentUserEmail,
+  setCurrentUser,
   setServerBase,
 } from "@/lib/api";
 
@@ -75,16 +75,16 @@ describe("mlUrl (prediction-service address)", () => {
 });
 
 describe("current identity", () => {
-  afterEach(() => setCurrentUserEmail(null));
+  afterEach(() => setCurrentUser(null, null));
 
   it("stores the signed-in email", () => {
-    setCurrentUserEmail("driver@test.org");
+    setCurrentUser("driver@test.org", "Drive@1");
     expect(getCurrentUserEmail()).toBe("driver@test.org");
   });
 
   it("falls back to the env identity when signed out", () => {
-    setCurrentUserEmail("driver@test.org");
-    setCurrentUserEmail(null);
+    setCurrentUser("driver@test.org", "Drive@1");
+    setCurrentUser(null, null);
     // no VITE_USER_EMAIL in the test env -> empty fallback
     expect(getCurrentUserEmail()).toBe("");
   });

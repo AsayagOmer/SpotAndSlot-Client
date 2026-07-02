@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import {
   loginUser,
   signUp as apiSignUp,
-  setCurrentUserEmail,
+  setCurrentUser,
   type NewUserInput,
   type UserBoundary,
 } from "@/lib/api";
@@ -19,6 +19,8 @@ export interface AuthUser {
   role: string;
   username?: string;
   avatar?: string;
+  // kept for the Sprint 4 per-request credentials (userPassword param)
+  password: string;
 }
 
 interface AuthContextValue {
@@ -31,20 +33,24 @@ interface AuthContextValue {
 
 const STORAGE_KEY = "spot-insight.auth";
 
-function fromBoundary(b: UserBoundary): AuthUser {
+function fromBoundary(b: UserBoundary, password: string): AuthUser {
   return {
     email: b.userId.email,
     systemID: b.userId.systemID,
     role: b.role,
     username: b.username,
     avatar: b.avatar,
+    password,
   };
 }
 
 function loadStoredUser(): AuthUser | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as AuthUser) : null;
+    const user = raw ? (JSON.parse(raw) as AuthUser) : null;
+    // sessions stored before Sprint 4 lack the password needed for the
+    // per-request credentials — force a fresh sign-in for those
+    return user && user.password ? user : null;
   } catch {
     return null;
   }
@@ -56,12 +62,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(() => {
     const stored = loadStoredUser();
     // stamp the API layer before the first data fetch
-    setCurrentUserEmail(stored?.email ?? null);
+    setCurrentUser(stored?.email ?? null, stored?.password ?? null);
     return stored;
   });
 
   useEffect(() => {
-    setCurrentUserEmail(user?.email ?? null);
+    setCurrentUser(user?.email ?? null, user?.password ?? null);
     if (user) localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
     else localStorage.removeItem(STORAGE_KEY);
   }, [user]);
@@ -71,13 +77,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       isAdmin: user?.role === "ADMIN",
       login: async (email, password) => {
-        const u = fromBoundary(await loginUser(email, password));
+        const u = fromBoundary(await loginUser(email, password), password);
         setUser(u);
         return u;
       },
       signup: async (input) => {
         await apiSignUp(input);
-        const u = fromBoundary(await loginUser(input.email, input.password));
+        const u = fromBoundary(await loginUser(input.email, input.password), input.password);
         setUser(u);
         return u;
       },
