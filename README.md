@@ -25,20 +25,40 @@ from the Smart Parking REST API — no mock data.
 
 ### Build the Android app (APK)
 
-Prerequisites: Android Studio (bundled JDK is used) + Android SDK.
+Prerequisites: a JDK (17–21) and the Android SDK. Installing **Android Studio**
+provides both; on a headless Linux machine the command-line SDK tools suffice.
 
 ```sh
 npm install                # first time only
 npm run cap:sync           # builds dist/mobile and syncs it into android/
 cd android
+```
+
+Then build the debug APK:
+
+```sh
+# Windows (Android Studio installed):
 JAVA_HOME="C:/Program Files/Android/Android Studio/jbr" ./gradlew assembleDebug
+
+# Linux (Android Studio installed):
+JAVA_HOME="$HOME/android-studio/jbr" ./gradlew assembleDebug
+
+# Linux (no Android Studio — JDK + cmdline SDK tools only):
+sudo apt-get install -y openjdk-21-jdk unzip
+# download "command line tools" from developer.android.com/studio, unzip to $HOME/android-sdk/cmdline-tools/latest
+export ANDROID_HOME="$HOME/android-sdk"
+yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses
+"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+./gradlew assembleDebug
+
 # → android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Install `app-debug.apk` on a device/emulator (`adb install`), or open `android/`
-in Android Studio and run. If Gradle can't find the SDK, create
-`android/local.properties` with `sdk.dir=C:/Users/<you>/AppData/Local/Android/Sdk`
-(forward slashes).
+Install `app-debug.apk` on a device/emulator (`adb install app-debug.apk`), or
+open `android/` in Android Studio and press Run. If Gradle can't find the SDK,
+create `android/local.properties` containing one line —
+`sdk.dir=/home/<you>/Android/Sdk` (Linux) or
+`sdk.dir=C:/Users/<you>/AppData/Local/Android/Sdk` (Windows, forward slashes).
 
 ## Admin app (desktop)
 
@@ -77,20 +97,45 @@ Seeded demo users (server `initDemos` profile):
 
 ## Run (web dev)
 
+### 0. One-time machine setup (clean Linux — no Node assumed)
+
+Both apps require **Node.js 18 or newer**. Distribution packages are often too
+old, so install via `nvm` (works on any distro, no sudo needed):
+
 ```sh
-npm install          # first time only
-npm run dev:mobile   # driver app  → http://localhost:8080
-npm run dev:admin    # admin app   → http://localhost:8090
+sudo apt-get update && sudo apt-get install -y git curl   # Ubuntu/Debian
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+. "$HOME/.nvm/nvm.sh"          # or open a new terminal
+nvm install --lts              # installs Node 22 LTS + npm
+node -v && npm -v              # verify: node 18+ and npm print versions
 ```
 
-Prerequisites for full functionality:
+> Already have Node? `node -v` must print v18 or higher — Vite 5 refuses to
+> run on older versions.
+
+### 1. Install dependencies and start
+
+From this repository's root:
+
+```sh
+npm install          # first time only (downloads all packages; needs internet)
+npm run dev:mobile   # driver app  → http://localhost:8080
+npm run dev:admin    # admin app   → http://localhost:8090  (run in a second terminal)
+```
+
+Both dev servers bind to all interfaces, so they are also reachable from other
+devices on the network via this machine's IP.
+
+Prerequisites for full functionality (see the API repo README for their
+from-scratch setup):
 
 - the **Smart Parking API** on `http://localhost:8084`
 - the **ML prediction service** on `http://localhost:5000` (Predictions tab;
   everything else works without it)
 
 Other scripts: `npm run build` (both apps), `npm run build:mobile`,
-`npm run build:admin`, `npm run cap:sync`, `npm run lint`.
+`npm run build:admin`, `npm run cap:sync`, `npm test` (unit tests),
+`npm run lint`.
 
 ## Notes
 
