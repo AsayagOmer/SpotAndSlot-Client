@@ -14,21 +14,23 @@ import {
 const CreateUserDialog = ({
   onCreate,
 }: {
-  onCreate: (u: { email: string; password: string; username?: string; role: string }) => Promise<unknown>;
+  onCreate: (u: { email: string; password: string; username: string; avatar: string; role: string }) => Promise<unknown>;
 }) => {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [avatar, setAvatar] = useState("🙂");
   const [role, setRole] = useState("END_USER");
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
     setBusy(true);
     try {
-      await onCreate({ email: email.trim(), password, username: username.trim() || undefined, role });
+      // the server requires non-blank username and avatar
+      await onCreate({ email: email.trim(), password, username: username.trim(), avatar: avatar.trim(), role });
       setOpen(false);
-      setEmail(""); setUsername(""); setPassword(""); setRole("END_USER");
+      setEmail(""); setUsername(""); setPassword(""); setAvatar("🙂"); setRole("END_USER");
     } catch { /* toast shown by act() */ }
     finally { setBusy(false); }
   };
@@ -51,6 +53,11 @@ const CreateUserDialog = ({
             <Input id="u-name" value={username} onChange={(e) => setUsername(e.target.value)} />
           </div>
           <div className="space-y-1.5">
+            <Label htmlFor="u-avatar">Avatar</Label>
+            <Input id="u-avatar" className="w-24 text-center text-lg" maxLength={4}
+              value={avatar} onChange={(e) => setAvatar(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
             <Label htmlFor="u-pass">Password</Label>
             <Input id="u-pass" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
             <p className="text-xs text-muted-foreground">At least 5 chars, incl. a digit and a special char.</p>
@@ -68,7 +75,7 @@ const CreateUserDialog = ({
           </div>
         </div>
         <DialogFooter>
-          <Button onClick={submit} disabled={busy || !email.trim() || !password}>
+          <Button onClick={submit} disabled={busy || !email.trim() || !password || !username.trim() || !avatar.trim()}>
             {busy && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />} Create user
           </Button>
         </DialogFooter>
