@@ -91,9 +91,10 @@
     font-family: 'Rubik', sans-serif;
   }
 
+  /* Direction comes from the dir attribute on <html>:
+     mobile/index.html is dir="rtl" (Hebrew), admin/index.html is dir="ltr". */
   body {
     @apply bg-background text-foreground antialiased;
-    direction: rtl;
   }
 }
 
