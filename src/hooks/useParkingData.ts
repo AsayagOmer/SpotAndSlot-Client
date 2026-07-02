@@ -61,7 +61,8 @@ function naturalCompare(a: string, b: string): number {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
 }
 
-function shapeParkingData(objects: ObjectBoundary[], selectedLotId: string | null): ParkingData {
+// Exported for unit tests (pure function: API objects -> GUI model).
+export function shapeParkingData(objects: ObjectBoundary[], selectedLotId: string | null): ParkingData {
   const lots = objects.filter((o) => o.type === ObjectType.PARKING_LOT);
   const sections = objects.filter((o) => o.type === ObjectType.PARKING_SECTION);
   const slots = objects.filter((o) => o.type === ObjectType.PARKING_SLOT && o.active !== false);
