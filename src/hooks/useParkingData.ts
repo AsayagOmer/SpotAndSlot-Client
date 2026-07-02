@@ -5,6 +5,7 @@ import {
   getAllCommands,
   predictAvailability,
   ObjectType,
+  mlUrl,
   type ObjectBoundary,
   type SlotDetails,
 } from "@/lib/api";
@@ -183,7 +184,7 @@ export function useDayForecast(dateYmd: string | null, totalSlots: number) {
   return useQuery({
     queryKey: ["forecast", dateYmd, totalSlots],
     queryFn: async (): Promise<DayForecast> => {
-      const res = await fetch("/ml/forecast", {
+      const res = await fetch(mlUrl("/forecast"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ date: dateYmd, totalSlots }),
