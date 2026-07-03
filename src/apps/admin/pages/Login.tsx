@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 
-// Desktop admin sign-in. Only ADMIN accounts may enter the console;
-// end users belong in the mobile app.
+// Desktop staff sign-in. ADMIN and OPERATOR accounts may enter the console
+// (admins manage users/activity, operators manage lots). Drivers (END_USER)
+// belong in the mobile app.
 const Login = () => {
   const { login, logout } = useAuth();
   const navigate = useNavigate();
@@ -23,16 +24,18 @@ const Login = () => {
     setBusy(true);
     try {
       const user = await login(email.trim(), password);
-      if (user.role !== "ADMIN") {
+      if (user.role !== "ADMIN" && user.role !== "OPERATOR") {
         logout();
-        toast.error("Administrator account required", {
-          description: "This console is for parking-lot administrators. Drivers should use the Spot&Slot mobile app.",
+        toast.error("Staff account required", {
+          description: "This console is for administrators and operators. Drivers should use the Spot&Slot mobile app.",
         });
         return;
       }
       toast.success(`Welcome back, ${user.username || user.email}`);
       const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
-      navigate(from ?? "/", { replace: true });
+      // admins land on Users, operators on the lots dashboard
+      const home = user.role === "ADMIN" ? "/users" : "/";
+      navigate(from ?? home, { replace: true });
     } catch {
       toast.error("Sign-in failed — check your email and password");
     } finally {

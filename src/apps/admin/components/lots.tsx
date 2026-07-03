@@ -36,6 +36,7 @@ export const CreateLotDialog = ({ onCreate }: { onCreate: (lot: ObjectBoundary) 
       const lot: ObjectBoundary = {
         type: ObjectType.PARKING_LOT,
         alias: alias.trim(),
+        status: "OPEN", // status is required by the server
         active: true,
         objectDetails: city.trim() ? { address: city.trim() } : {},
       };
@@ -105,6 +106,7 @@ export const ManageSections = ({
       createObject({
         type: ObjectType.PARKING_SECTION,
         alias: newSection.trim(),
+        status: "OPEN", // status is required by the server
         active: true,
         objectDetails: { parentLotId: lotId },
       }),

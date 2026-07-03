@@ -1,5 +1,4 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { format } from "date-fns";
 import {
   Shield, LayoutDashboard, LayoutGrid, Users as UsersIcon, Activity, LogOut, RefreshCw,
 } from "lucide-react";
@@ -10,13 +9,15 @@ import {
   SidebarMenuItem, SidebarMenuButton, SidebarInset, SidebarTrigger, SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { useAllObjects } from "@/hooks/useParkingData";
 import { apiConfig } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
-const NAV = [
+// Nav is role-based: OPERATORs manage parking objects; ADMINs use the Admin API.
+const OPERATOR_NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/lots", label: "My Lots", icon: LayoutGrid, end: false },
+];
+const ADMIN_NAV = [
   { to: "/users", label: "Users", icon: UsersIcon, end: false },
   { to: "/activity", label: "Activity", icon: Activity, end: false },
 ];
@@ -28,13 +29,12 @@ const PAGE_TITLES: Record<string, string> = {
   "/activity": "Activity",
 };
 
-// Desktop admin shell: fixed sidebar navigation + wide content area.
+// Desktop staff console shell: fixed sidebar navigation + wide content area.
 const AdminLayout = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, isAdmin } = useAuth();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const objectsQ = useAllObjects();
-  const lastUpdated = objectsQ.dataUpdatedAt ? new Date(objectsQ.dataUpdatedAt) : null;
+  const nav = isAdmin ? ADMIN_NAV : OPERATOR_NAV;
 
   return (
     <SidebarProvider>
@@ -50,17 +50,19 @@ const AdminLayout = () => {
                 <span className="text-primary">&</span>
                 <span className="text-secondary">Slot</span>
               </div>
-              <div className="text-[11px] text-muted-foreground truncate">Admin Console</div>
+              <div className="text-[11px] text-muted-foreground truncate">
+                {isAdmin ? "Admin Console" : "Operator Console"}
+              </div>
             </div>
           </div>
         </SidebarHeader>
         <SidebarSeparator />
         <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel>Management</SidebarGroupLabel>
+            <SidebarGroupLabel>{isAdmin ? "Administration" : "Management"}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {NAV.map((item) => (
+                {nav.map((item) => (
                   <SidebarMenuItem key={item.to}>
                     <SidebarMenuButton
                       asChild
@@ -108,10 +110,8 @@ const AdminLayout = () => {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <span className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span className={`w-2 h-2 rounded-full ${objectsQ.isError ? "bg-destructive" : "bg-emerald-500"}`} />
-                {lastUpdated ? `updated ${format(lastUpdated, "HH:mm:ss")}` : "connecting…"}
-                <span className="text-border">·</span>
-                {apiConfig.SYSTEM_ID}
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                {user?.role} · {apiConfig.SYSTEM_ID}
               </span>
               <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries()}>
                 <RefreshCw className="w-4 h-4" />

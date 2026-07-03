@@ -7,13 +7,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAdminCommands } from "@/hooks/useParkingData";
-import { useAdminStats, useObjectMap } from "../hooks";
 
-// Command-history feed, newest first, with targets resolved to type + alias.
+// Command-history feed, newest first. This is an ADMIN view over the Admin API;
+// ADMINs may not read objects, so targets are shown by id.
 const Activity = () => {
   const commandsQ = useAdminCommands();
-  const { objects } = useAdminStats();
-  const objectMap = useObjectMap(objects);
   const commands = commandsQ.data ?? [];
 
   const recentCommands = useMemo(
@@ -37,7 +35,6 @@ const Activity = () => {
           <TableBody>
             {recentCommands.map((c, i) => {
               const targetId = c.targetObject?.id?.objectId;
-              const t = targetId ? objectMap.get(targetId) : undefined;
               return (
                 <TableRow key={c.id?.commandId ?? i}>
                   <TableCell className="text-xs text-muted-foreground tabular-nums">
@@ -48,11 +45,7 @@ const Activity = () => {
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">{c.invokedBy?.userId.email ?? "—"}</TableCell>
                   <TableCell className="text-sm">
-                    {t ? (
-                      <span><span className="text-muted-foreground">{t.type}</span>{t.alias ? ` · ${t.alias}` : ""}</span>
-                    ) : (
-                      <span className="text-muted-foreground font-mono text-xs">{targetId?.slice(0, 8) ?? "—"}</span>
-                    )}
+                    <span className="text-muted-foreground font-mono text-xs">{targetId?.slice(0, 8) ?? "—"}</span>
                   </TableCell>
                 </TableRow>
               );

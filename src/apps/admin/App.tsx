@@ -15,8 +15,10 @@ import Activity from "./pages/Activity";
 
 const queryClient = new QueryClient();
 
-// Desktop admin console: ADMIN-only, sidebar navigation, wide layout.
-// The end-user experience lives in the mobile app (src/apps/mobile).
+// Desktop staff console with role-based sections:
+// - OPERATOR: Dashboard + My Lots (build and manage the parking objects they own)
+// - ADMIN: Users + Activity (the Admin API: manage users, view command history)
+// End users use the mobile app (src/apps/mobile).
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -26,17 +28,20 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
+            {/* console shell: any staff role (ADMIN or OPERATOR) */}
             <Route
               element={
-                <RequireAuth role="ADMIN" fallbackTo="/login">
+                <RequireAuth roles={["ADMIN", "OPERATOR"]} fallbackTo="/login">
                   <AdminLayout />
                 </RequireAuth>
               }
             >
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/lots" element={<Lots />} />
-              <Route path="/users" element={<Users />} />
-              <Route path="/activity" element={<Activity />} />
+              {/* OPERATOR area — reads/writes parking objects */}
+              <Route path="/" element={<RequireAuth role="OPERATOR" fallbackTo="/users"><Dashboard /></RequireAuth>} />
+              <Route path="/lots" element={<RequireAuth role="OPERATOR" fallbackTo="/users"><Lots /></RequireAuth>} />
+              {/* ADMIN area — the Admin API */}
+              <Route path="/users" element={<RequireAuth role="ADMIN" fallbackTo="/"><Users /></RequireAuth>} />
+              <Route path="/activity" element={<RequireAuth role="ADMIN" fallbackTo="/"><Activity /></RequireAuth>} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
