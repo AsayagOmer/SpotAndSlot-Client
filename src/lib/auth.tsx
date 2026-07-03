@@ -26,6 +26,9 @@ export interface AuthUser {
 interface AuthContextValue {
   user: AuthUser | null;
   isAdmin: boolean;
+  isOperator: boolean;
+  // ADMIN + OPERATOR staff may enter the desktop console
+  canUseConsole: boolean;
   login: (email: string, password: string) => Promise<AuthUser>;
   signup: (input: NewUserInput) => Promise<AuthUser>;
   logout: () => void;
@@ -76,6 +79,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       isAdmin: user?.role === "ADMIN",
+      isOperator: user?.role === "OPERATOR",
+      canUseConsole: user?.role === "ADMIN" || user?.role === "OPERATOR",
       login: async (email, password) => {
         const u = fromBoundary(await loginUser(email, password), password);
         setUser(u);

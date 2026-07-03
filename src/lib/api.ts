@@ -8,7 +8,7 @@
 
 const DEFAULT_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8084/ambient-invisible-intelligence";
 const SYSTEM_ID = import.meta.env.VITE_SYSTEM_ID ?? "2026b.Omer.Asayag";
-const API_VERSION = import.meta.env.VITE_API_VERSION ?? "1.3";
+const API_VERSION = import.meta.env.VITE_API_VERSION ?? "1.4";
 const SERVER_KEY = "spot-insight.server-base";
 
 // ── Server address ───────────────────────────────────────────────────────────

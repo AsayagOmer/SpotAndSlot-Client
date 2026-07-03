@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/auth";
 import { getServerBase, setServerBase } from "@/lib/api";
 
 const Login = () => {
-  const { login } = useAuth();
+  const { login, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState("");
@@ -26,6 +26,15 @@ const Login = () => {
     setBusy(true);
     try {
       const user = await login(email.trim(), password);
+      // this app is for drivers (END_USER); staff use the desktop console
+      if (user.role !== "END_USER") {
+        logout();
+        toast.error("האפליקציה מיועדת לנהגים", {
+          description: "מנהלים ומפעילים משתמשים בקונסולת הניהול בדפדפן",
+          position: "top-center",
+        });
+        return;
+      }
       toast.success(`ברוך הבא, ${user.username || user.email}!`, { position: "top-center" });
       const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
       navigate(from ?? "/", { replace: true });

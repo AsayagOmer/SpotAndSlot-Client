@@ -60,14 +60,20 @@ create `android/local.properties` containing one line —
 `sdk.dir=/home/<you>/Android/Sdk` (Linux) or
 `sdk.dir=C:/Users/<you>/AppData/Local/Android/Sdk` (Windows, forward slashes).
 
-## Admin app (desktop)
+## Staff console (desktop)
 
-- **ADMIN-only**: sign-in rejects non-admin accounts; all routes are guarded.
-- Sidebar navigation: **Dashboard** (stats + per-lot occupancy), **My Lots**
-  (create/rename/delete lots, manage sections & slots, run health checks),
-  **Users** (list + create users incl. other admins), **Activity** (command
-  history).
-- Scoped by ownership: each admin sees and manages only the lots they created.
+Staff (ADMIN or OPERATOR) sign in here; drivers (END_USER) are turned away and
+use the mobile app. The sidebar adapts to the role (Sprint 4 role model):
+
+- **OPERATOR** — **Dashboard** (stats + per-lot occupancy) and **My Lots**
+  (create/rename/delete lots, manage sections & slots). Scoped by ownership:
+  each operator sees and manages only the lots they created.
+- **ADMIN** — **Users** (list + create users of any role) and **Activity**
+  (command history). Per the role model, ADMINs use only the Admin API and do
+  not read parking objects.
+
+Health checks are commands, which only END_USERs may invoke, so they are not
+offered in the console.
 
 ## How the apps talk to the backend
 
@@ -90,10 +96,10 @@ Seeded demo users (server `initDemos` profile):
 
 | Email | Password | Role | Owns |
 |---|---|---|---|
-| `admin@demo.org` | `Admin@1` | ADMIN | North TLV Lot, Central Lot |
-| `admin2@demo.org` | `Admin@2` | ADMIN | South Beach Lot |
-| `operator@demo.org` | `Oper@1` | OPERATOR | — |
-| `user@demo.org` | `User@1` | END_USER | — |
+| `admin@demo.org` | `Admin@1` | ADMIN | — (Admin API only) |
+| `operator@demo.org` | `Oper@1` | OPERATOR | North TLV Lot, Central Lot |
+| `operator2@demo.org` | `Oper@2` | OPERATOR | South Beach Lot |
+| `user@demo.org` | `User@1` | END_USER | — (drivers use the mobile app) |
 
 ## Run (web dev)
 
