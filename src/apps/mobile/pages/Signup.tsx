@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
+import { ApiError } from "@/lib/api";
 
 // Public self sign-up. New accounts are always END_USER; admins and operators
 // are created from the admin console by an existing administrator.
@@ -38,15 +39,24 @@ const Signup = () => {
       toast.success("החשבון נוצר — ברוך הבא!", { position: "top-center" });
       navigate("/", { replace: true });
     } catch (err) {
-      const msg = (err as Error).message;
-      toast.error(
-        msg.includes("password")
-          ? "סיסמה חלשה — נדרשים לפחות 5 תווים, ספרה ותו מיוחד"
-          : msg.includes("exists")
-          ? "משתמש עם אימייל זה כבר קיים"
-          : "ההרשמה נכשלה — נסה שוב",
-        { position: "top-center" },
-      );
+      // A network / mixed-content failure rejects with a plain TypeError, not an
+      // ApiError — surface that as "can't reach server" rather than a data error.
+      if (!(err instanceof ApiError)) {
+        toast.error("לא ניתן להתחבר לשרת", {
+          description: "בדוק את כתובת השרת ואת החיבור לרשת",
+          position: "top-center",
+        });
+      } else {
+        const msg = err.message;
+        toast.error(
+          msg.includes("password")
+            ? "סיסמה חלשה — נדרשים לפחות 5 תווים, ספרה ותו מיוחד"
+            : msg.includes("exists")
+            ? "משתמש עם אימייל זה כבר קיים"
+            : "ההרשמה נכשלה — נסה שוב",
+          { position: "top-center" },
+        );
+      }
     } finally {
       setBusy(false);
     }
