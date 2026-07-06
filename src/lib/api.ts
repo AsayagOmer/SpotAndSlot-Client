@@ -148,6 +148,19 @@ function headers(): HeadersInit {
   };
 }
 
+// Thrown when the server responds with a non-OK HTTP status. `status` lets
+// callers tell an authentication failure (401) apart from other server errors —
+// and, crucially, apart from a network/connectivity failure, which rejects with
+// a plain TypeError (not an ApiError) instead.
+export class ApiError extends Error {
+  readonly status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 async function handle<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let detail = "";
@@ -156,7 +169,7 @@ async function handle<T>(res: Response): Promise<T> {
     } catch {
       /* ignore */
     }
-    throw new Error(`API ${res.status} ${res.statusText}${detail ? `: ${detail}` : ""}`);
+    throw new ApiError(res.status, `API ${res.status} ${res.statusText}${detail ? `: ${detail}` : ""}`);
   }
   // Some endpoints (PUT, DELETE) return no body
   const text = await res.text();

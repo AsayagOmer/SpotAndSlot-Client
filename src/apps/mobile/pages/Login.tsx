@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
-import { getServerBase, setServerBase } from "@/lib/api";
+import { getServerBase, setServerBase, ApiError } from "@/lib/api";
 
 const Login = () => {
   const { login, logout } = useAuth();
@@ -38,8 +38,20 @@ const Login = () => {
       toast.success(`ברוך הבא, ${user.username || user.email}!`, { position: "top-center" });
       const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
       navigate(from ?? "/", { replace: true });
-    } catch {
-      toast.error("התחברות נכשלה — בדוק אימייל וסיסמה", { position: "top-center" });
+    } catch (err) {
+      // Tell a real credential rejection (HTTP 401) apart from the app simply
+      // not being able to reach the server (network / mixed-content error,
+      // which rejects with a TypeError rather than an ApiError).
+      if (err instanceof ApiError && err.status === 401) {
+        toast.error("אימייל או סיסמה שגויים", { position: "top-center" });
+      } else if (err instanceof ApiError) {
+        toast.error(`שגיאת שרת (${err.status})`, { position: "top-center" });
+      } else {
+        toast.error("לא ניתן להתחבר לשרת", {
+          description: "בדוק את כתובת השרת ואת החיבור לרשת",
+          position: "top-center",
+        });
+      }
     } finally {
       setBusy(false);
     }
