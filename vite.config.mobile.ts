@@ -7,6 +7,7 @@ import { VitePWA } from "vite-plugin-pwa";
 // Mobile (end-user) app: served in dev on :8080, built to dist/mobile, and
 // wrapped by Capacitor into the Android app (see capacitor.config.ts).
 export default defineConfig(({ mode }) => ({
+  base: process.env.GITHUB_PAGES ? "/SpotAndSlot-Client/" : "/",
   root: path.resolve(__dirname, "mobile"),
   publicDir: path.resolve(__dirname, "public"),
   build: {
