@@ -15,7 +15,7 @@ const LotSelector = () => {
   if (lots.length <= 1) return null;
 
   return (
-    <Select value={selectedLotId ?? undefined} onValueChange={setSelectedLotId}>
+    <Select value={selectedLotId ?? undefined} onValueChange={setSelectedLotId} dir="rtl">
       <SelectTrigger className="w-full bg-card rounded-2xl h-12 border-border hover:border-primary/30 transition-colors">
         <div className="flex items-center gap-2">
           <MapPin className="w-4 h-4 text-primary shrink-0" />

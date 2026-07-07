@@ -105,21 +105,7 @@ const PredictionsView = () => {
         <p className="text-muted-foreground mt-1">תכנן את ההגעה שלך ל{lotAlias}</p>
       </div>
 
-      {/* model status / holiday banner */}
-      <div className="card-elevated p-3 flex items-center justify-between border-2 border-primary/20">
-        <div className="flex items-center gap-2 text-primary">
-          {isFetching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Server className="w-4 h-4" />}
-          <span className="text-sm font-medium">חיזוי יומי</span>
-        </div>
-        {forecast?.isHoliday ? (
-          <div className="flex items-center gap-1.5 text-amber-600 text-sm font-medium">
-            <PartyPopper className="w-4 h-4" />
-            <span>{forecast.holidayName} — חג</span>
-          </div>
-        ) : (
-          <span className="text-xs text-muted-foreground">טווח ביטחון 80%</span>
-        )}
-      </div>
+
 
       {/* Date/Time selectors */}
       <div className="flex gap-3">
