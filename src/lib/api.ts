@@ -50,6 +50,10 @@ function isNative(): boolean {
 // /ml → localhost:5000; the native app has no proxy, so it calls the service
 // directly on the API server's host.
 export function mlUrl(path: string): string {
+  if (import.meta.env.VITE_ML_BASE_URL) {
+    const clean = import.meta.env.VITE_ML_BASE_URL.replace(/\/+$/, "");
+    return `${clean}${path}`;
+  }
   if (!isNative()) return `/ml${path}`;
   try {
     const u = new URL(BASE_URL);
