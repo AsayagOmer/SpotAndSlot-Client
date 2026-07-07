@@ -109,7 +109,7 @@ const PredictionsView = () => {
       <div className="card-elevated p-3 flex items-center justify-between border-2 border-primary/20">
         <div className="flex items-center gap-2 text-primary">
           {isFetching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Server className="w-4 h-4" />}
-          <span className="text-sm font-medium">מודל XGBoost · חיזוי יומי</span>
+          <span className="text-sm font-medium">חיזוי יומי</span>
         </div>
         {forecast?.isHoliday ? (
           <div className="flex items-center gap-1.5 text-amber-600 text-sm font-medium">
